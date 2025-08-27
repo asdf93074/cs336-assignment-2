@@ -8,6 +8,8 @@
 \usepackage{caption}
 \usepackage{hyperref}
 \usepackage{listings}
+\usepackage{graphicx}
+\renewcommand{\labelenumi}{(\alph{enumi})}
 \lstset{
   basicstyle=\ttfamily\small,
   breaklines=true,
@@ -25,10 +27,11 @@
 
 \section{benchmarking\_script}
 
-\subsection*{a}
+\begin{enumerate}
+\item
 Written in \texttt{benchmark.py}.
 
-\subsection*{b}
+\item
 \textbf{Commands:}
 \begin{lstlisting}[language=bash]
 # small
@@ -55,16 +58,16 @@ python benchmark.py --d-model 2560 --d-ff 10240 --num-layers 32 --num-heads 32
 \label{tab:benchmark}
 \begin{tabular}{llrrrrr}
 \toprule
-Model & Pass & Warmup & Min (s) & Max (s) & Avg (s) & Std (s) \\
+Model & Pass & Warmup & Mean (s) & Std (s) \\
 \midrule
-Small  & Forward  & 0 & 0.030826 & 0.437965 & 0.072297 & 0.121894 \\
-Small  & Backward & 0 & 0.065635 & 0.470007 & 0.106601 & 0.121139 \\
-Small  & Forward  & 1 & 0.030985 & 0.032706 & 0.031458 & 0.000598 \\
-Small  & Backward & 1 & 0.066029 & 0.072107 & 0.067038 & 0.001763 \\
-Medium & Forward  & 0 & 0.095544 & 0.489508 & 0.136340 & 0.117727 \\
-Medium & Backward & 0 & 0.199060 & 0.608251 & 0.241945 & 0.122108 \\
-Medium & Forward  & 1 & 0.095837 & 0.099985 & 0.097735 & 0.001412 \\
-Medium & Backward & 1 & 0.199726 & 0.203641 & 0.202035 & 0.001391 \\
+Small  & Forward  & 0 & 0.072297 & 0.121894 \\
+Small  & Backward & 0 & 0.106601 & 0.121139 \\
+Small  & Forward  & 1 & 0.031458 & 0.000598 \\
+Small  & Backward & 1 & 0.067038 & 0.001763 \\
+Medium & Forward  & 0 & 0.136340 & 0.117727 \\
+Medium & Backward & 0 & 0.241945 & 0.122108 \\
+Medium & Forward  & 1 & 0.097735 & 0.001412 \\
+Medium & Backward & 1 & 0.202035 & 0.001391 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -73,19 +76,36 @@ Medium & Backward & 1 & 0.199726 & 0.203641 & 0.202035 & 0.001391 \\
 Cannot do rest due to memory limitations (8GB).
 \end{lstlisting}
 
-\subsection*{c}
+\item
 Minor increase in measured time with 0 warmup steps. This happens because some optimizations are done based on the first pass, so warming up lets the correct cache/shapes be known in advance for the next passes.
+\end{enumerate}
 
 \newpage
 \section{nsys\_profile}
 
-\subsection*{a}
+\begin{enumerate}
+\item
+\begin{table}[h!]
+\centering
+\caption{Benchmark results on forward pass on Nsys vs Python standard library.}
+\label{tab:benchmark}
+\begin{tabular}{llrrrrr}
+\toprule
+Model & Context Length & Nsys Mean (ms) & Python Mean (ms) \\
+\midrule
+Small  & 128 & 40.780  & 40.479 \\
+Small  & 256 & 41.320  & 43.825 \\
+Small  & 512 & 40.996  & 70.388 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 Total time is roughly 40\,ms for all context sizes (did small model only due to memory constraints) but our measured time in Python keeps increasing due to device sync overhead.
 
-\subsection*{b}
+\item
 \texttt{ampere\_sgemm\_128x64\_nn} takes up the most time in both forward and backward passes. It is called 52 times in the forward pass.
 
-\subsection*{c}
+\item
 \textbf{Forward:}
 \begin{lstlisting}
 Time    Total Time    Instances    Avg         Med         Min         Max         StdDev    Name
@@ -99,11 +119,12 @@ Time     Total Time    Instances    Avg         Med         Min         Max     
 10.5%    6.012 ms      68           88.410 \textmus   36.176 \textmus   1.152 \textmus    274.627 \textmus  85.005 \textmus  void at::native::vectorized_elementwise_kernel<(int)4, ...>
 \end{lstlisting}
 
-\subsection*{d}
+\item
 Optimizer takes up a huge chunk of time but overall, kernel contribution remains the same.
 
-\subsection*{e}
+\item
 Matrix multiplication takes approximately 762\,$\mu$s while computing softmax takes approximately 800\,$\mu$s. The matrix multiplication has much more FLOPs than softmax.
+\end{enumerate}
 
 \newpage
 \section{mixed\_precision\_accumulation}
@@ -121,23 +142,62 @@ Accumulating in FP32 lets us retain a more accurate result when adding floats of
 \newpage
 \section{benchmarking\_mixed\_precision}
 
-\subsection*{a}
+\begin{enumerate}
+\item
 \begin{itemize}
-  \item Model parameters: FP16
-  \item Output of first feedforward layer: FP32
+  \item Model parameters: FP32
+  \item Output of first feedforward layer: FP16
   \item Output of layer norm: FP16
   \item Predicted logits: FP16
   \item Loss: FP32
   \item Gradients: FP16
 \end{itemize}
 
-\subsection*{b}
+\item
 The mean and variance calculations in layernorm are sensitive to mixed precision.
 The subtraction in mean, squaring in variance and sqrt in normalization are all sensitive.
 Using BF16 is okay as it has the same range as FP32 so we could treat layernorm with mixed precision then.
 
 
-\subsection*{c}
+\item
+With bigger batch sizes, model sizes and context length, mixed precision is significantly faster.
+\end{enumerate}
+
+\newpage
+\section{benchmarking\_mixed\_precision}
+Using only small + 128 context length due to memory limitations.
+
+\begin{enumerate}
+\item
+\begin{figure}[h]
+    \centering
+    \includegraphics[scale=0.3]{../traces/images/memory_viz_full_small_128_forward_only.png}
+    \caption{Forward only.}
+\end{figure}
+\begin{figure}[h]
+    \centering
+    \includegraphics[scale=0.3]{../traces/images/memory_viz_full_small_128_full_step.png}
+    \caption{Full step.}
+\end{figure}
+
+The peaks for forward pass have very sharp ends which makes them identifiable. Memory rises and falls for each pass. We also see a big chunk being cleared when we are clearing gradients in our full step.
+
+\item
+Peak memory usage of Forward Pass: ~3.4GB
+Peak memory usage of Full Step: ~4.7GB
+
+\item
+Peak memory usage (mixed precision) of Forward Pass: ~3GB
+Peak memory usage (mixed precision) of Full Step: ~4.5GB
+
+There is a small improvement in memory usage but not a major one.
+
+\item
+Considering for small sized model: (using 16 batch size) 16 x 128 x 768 x 2 bytes = 0.75 MiB 
+
+\item
+Yes by calculating the memory size of a matrix at a particular layer, we actually can find it in the graph and also figure out where we are in the taining layers. Just looking at the biggest allocations also helps figure this out e.g. in my case its the logits shape (16 x 128 x 10000) which indicates the end of training when its allocation ends.
+We can also look at some of the smaller repetitive patterns to see our transformer layers in action.
+\end{enumerate}
 
 \end{document}
-
