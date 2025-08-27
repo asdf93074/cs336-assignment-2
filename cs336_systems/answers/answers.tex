@@ -200,4 +200,39 @@ Yes by calculating the memory size of a matrix at a particular layer, we actuall
 We can also look at some of the smaller repetitive patterns to see our transformer layers in action.
 \end{enumerate}
 
+\newpage
+\section{pytorch\_attention}
+\begin{enumerate}
+\item
+\begin{table}[h!]
+\centering
+\label{tab:benchmark}
+\begin{tabular}{llrrrrr}
+\toprule
+d\_model & Sequence Length & Forward Mean (ms) & Backward Mean (ms) & Mem. Usage (MB) \\
+\midrule
+16 & 256 & 0.3204 & 2.3416 & 41.8000 \\
+16 & 1024 & 0.4285 & 1.9817 & 239.3200 \\
+16 & 4096 & 0.5548 & 19.3975 & 3139.7600 \\
+32 & 256 & 0.3811 & 1.2181 & 339.9800 \\
+32 & 1024 & 0.4645 & 2.1281 & 245.2800 \\
+32 & 4096 & 0.5351 & 19.5532 & 3145.7600 \\
+64 & 256 & 0.3615 & 1.1155 & 369.9800 \\
+64 & 1024 & 0.5135 & 2.0453 & 239.3600 \\
+64 & 4096 & 0.5414 & 22.9726 & 3175.7600 \\
+128 & 256 & 0.3671 & 1.1074 & 459.9200 \\
+128 & 1024 & 0.4364 & 2.2736 & 273.0400 \\
+128 & 4096 & 0.5530 & 43.8644 & 3701.5200 \\
+\bottomrule
+\end{tabular}
+\end{table}
+OOM on sequence lengths 8192 and 16384 for all d\_models.
+For any QK where sequence length is 8192:
+  batch size x sequence length x sequence length = 8 x 8192 x 8192 x 4 bytes = 2048 MB
+
+We need 2x that for the backward pass.
+
+Memory reserved before backward pass is being dominated by sequence length. We can see that regardless of d\_model, a sequence length of 4096 results in memory usage upwards of 3GB. Reducing the quadratic memory nature of QK in attention would help in reducing memory significantly.
+
+\end{enumerate}
 \end{document}
