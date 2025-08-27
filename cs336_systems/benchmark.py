@@ -44,6 +44,7 @@ def run(
     warm_up_steps: int = 0,
     forward_only: bool = True,
     mixed_precision: bool = False,
+    record_memory: bool = False,
     device: torch.device | None = None,
 ) -> tuple[ProfileResults, ProfileResults]:
     """Profile a model's forward or forward+backward passes.
@@ -55,7 +56,7 @@ def run(
         forward_only (bool): If True, count only forward passes (one forward = one step).
             If False, count both forward and backward passes as one step.
     """
-    batch_size = 4
+    batch_size = 16 
 
     model = model.to(device)
     optim = AdamW(model.parameters())
@@ -63,7 +64,8 @@ def run(
     forw_results = []
     backw_results = []
 
-    cm = torch.autocast(device_type="cuda", dtype=torch.bfloat16) if mixed_precision else nullcontext()
+    cm = torch.autocast(device_type="cuda", dtype=torch.float16) if mixed_precision else nullcontext()
+    no_grad = torch.no_grad() if forward_only else nullcontext()
 
     for _ in range(warm_up_steps):
         inputs = torch.randint(
@@ -89,6 +91,8 @@ def run(
 
         cuda_sync()
 
+    if record_memory:
+        torch.cuda.memory._record_memory_history(max_entries=1000000)
     for i in range(n):
         inputs = torch.randint(
                 0, vocab_size, (batch_size, context_length), device=device
@@ -100,7 +104,7 @@ def run(
         start = timeit.default_timer()
 
         with nvtx.range("forward pass"):
-            with cm:
+            with cm, no_grad:
                 out = model(inputs)
                 loss = cs336_basics.nn_utils.cross_entropy(out, targets)
 
@@ -112,7 +116,7 @@ def run(
             if not forward_only:
                 loss.backward()
                 optim.step()
-
+        optim.zero_grad()
 
         backw_end = timeit.default_timer()
 
@@ -121,6 +125,9 @@ def run(
 
             if not forward_only:
                 backw_results.append(backw_end - forw_end)
+    if record_memory:
+        torch.cuda.memory._dump_snapshot(f"memory_snapshot_{"mixed" if mixed_precision else "full"}_{context_length}_{"forward" if forward_only else "both"}.pickle")
+        torch.cuda.memory._record_memory_history(enabled=None)
 
     return forw_results, backw_results
 
@@ -128,6 +135,13 @@ def run(
 def create_model(model_cls: type[torch.nn.Module], params: TransformerParams):
     return model_cls(**asdict(params))
 
+def calculate_measures(results: ProfileResults) -> tuple[float, float]:
+    n = len(results)
+    mean = sum(results) / n
+    var = sum([(x - mean) ** 2 for x in results]) / n
+    std = sqrt(var)
+
+    return mean, std
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -144,6 +158,7 @@ if __name__ == "__main__":
     parser.add_argument("--profiling-steps", type=int, default=10)
     parser.add_argument("--forward-only", action="store_true")
     parser.add_argument("--mixed-precision", action="store_true")
+    parser.add_argument("--record-memory", action="store_true")
     args = parser.parse_args()
 
     if args.forward_only:
@@ -173,24 +188,17 @@ if __name__ == "__main__":
         args.warm_up_steps,
         args.forward_only,
         args.mixed_precision,
+        args.record_memory,
         device=device,
     )
 
-    n = len(forw_results)
-    mean = sum(forw_results) / n
-    var = sum([(x - mean) ** 2 for x in forw_results]) / n
-    std = sqrt(var)
-
+    mean, std = calculate_measures(forw_results)
     print("\nForward Pass:")
-    print(f"Min: {min(forw_results):.6f}, Max: {max(forw_results):.6f}, Avg: {mean:.6f} Std: {std:.6f}")
+    print(f"Avg: {mean:.6f} Std: {std:.6f}")
 
     if not args.forward_only:
-        n = len(backw_results)
-        mean = sum(backw_results) / n
-        var = sum([(x - mean) ** 2 for x in backw_results]) / n
-        std = sqrt(var)
-
+        mean, std = calculate_measures(backw_results)
         print("\nBackward Pass:")
         print(
-            f"Min: {min(backw_results):.6f}, Max: {max(backw_results):.6f}, Avg: {mean:.6f} Std: {std:.6f}"
+            f"Avg: {mean:.6f} Std: {std:.6f}"
         )
