@@ -26,6 +26,13 @@ def attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, mask: torch.Ten
     return einsum(qk_softmax, V, "... queries keys, ... keys d_k -> ... queries d_k")
 
 if __name__ == "__main__":
+    torch.set_float32_matmul_precision("high")
+
+    compile = sys.argv[-1]
+    if compile == "compile":
+        print("'compile' passed. Using torch.compile.")
+        attention = torch.compile(attention)
+
     device = torch.device("cuda")
 
     warmup_steps     = 10

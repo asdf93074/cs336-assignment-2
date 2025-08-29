@@ -159,6 +159,7 @@ if __name__ == "__main__":
     parser.add_argument("--forward-only", action="store_true")
     parser.add_argument("--mixed-precision", action="store_true")
     parser.add_argument("--record-memory", action="store_true")
+    parser.add_argument("--compile", action="store_true")
     args = parser.parse_args()
 
     if args.forward_only:
@@ -180,6 +181,10 @@ if __name__ == "__main__":
         rope_theta=args.rope_theta,
     )
     model = create_model(BasicsTransformerLM, model_params)
+    if args.compile:
+        print("'--compile' is True. JIT compiling the model.")
+        model.compile() 
+
     forw_results, backw_results = run(
         model,
         args.vocab_size,

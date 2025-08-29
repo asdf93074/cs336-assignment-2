@@ -211,18 +211,18 @@ We can also look at some of the smaller repetitive patterns to see our transform
 \toprule
 d\_model & Sequence Length & Forward Mean (ms) & Backward Mean (ms) & Mem. Usage (MB) \\
 \midrule
-16 & 256 & 0.3204 & 2.3416 & 41.8000 \\
-16 & 1024 & 0.4285 & 1.9817 & 239.3200 \\
-16 & 4096 & 0.5548 & 19.3975 & 3139.7600 \\
-32 & 256 & 0.3811 & 1.2181 & 339.9800 \\
-32 & 1024 & 0.4645 & 2.1281 & 245.2800 \\
-32 & 4096 & 0.5351 & 19.5532 & 3145.7600 \\
-64 & 256 & 0.3615 & 1.1155 & 369.9800 \\
-64 & 1024 & 0.5135 & 2.0453 & 239.3600 \\
-64 & 4096 & 0.5414 & 22.9726 & 3175.7600 \\
-128 & 256 & 0.3671 & 1.1074 & 459.9200 \\
-128 & 1024 & 0.4364 & 2.2736 & 273.0400 \\
-128 & 4096 & 0.5530 & 43.8644 & 3701.5200 \\
+16 & 256 & 0.3331 & 2.2741 & 41.8000 \\
+16 & 1024 & 0.4399 & 1.7989 & 239.3200 \\
+16 & 4096 & 0.5644 & 16.4094 & 3139.7600 \\
+32 & 256 & 0.3786 & 1.0753 & 339.9800 \\
+32 & 1024 & 0.4001 & 1.8448 & 245.2800 \\
+32 & 4096 & 0.5684 & 16.5382 & 3145.7600 \\
+64 & 256 & 0.3932 & 1.1707 & 369.9800 \\
+64 & 1024 & 0.4139 & 1.8072 & 239.3600 \\
+64 & 4096 & 0.5717 & 16.9213 & 3175.7600 \\
+128 & 256 & 0.6964 & 2.0495 & 459.9200 \\
+128 & 1024 & 0.4726 & 1.9223 & 273.0400 \\
+128 & 4096 & 0.5614 & 19.2572 & 3701.5200 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -235,4 +235,37 @@ We need 2x that for the backward pass.
 Memory reserved before backward pass is being dominated by sequence length. We can see that regardless of d\_model, a sequence length of 4096 results in memory usage upwards of 3GB. Reducing the quadratic memory nature of QK in attention would help in reducing memory significantly.
 
 \end{enumerate}
+
+\newpage
+\section{torch\_compile}
+\begin{enumerate}
+\item
+\begin{table}[h!]
+\centering
+\label{tab:benchmark}
+\begin{tabular}{llrrrrr}
+\toprule
+d\_model & Sequence Length & Forward Mean (ms) & Backward Mean (ms) & Forward Mean C. (ms) & Backward Mean C. (ms) &  \\
+\midrule
+16 & 256 & 0.3331 & 2.2741 &  0.2479 & 3.7499 & 41.8000 \\
+16 & 1024 & 0.4399 & 1.7989 & 0.3416 & 1.0678 & 175.3200 \\
+16 & 4096 & 0.5644 & 16.4094 & 0.5069 & 6.6920 & 2115.7600 \\
+32 & 256 & 0.3786 & 1.0753 &  0.3094 & 1.8125 & 339.9800 \\
+32 & 1024 & 0.4001 & 1.8448 & 0.3598 & 1.1687 & 181.2800 \\
+32 & 4096 & 0.5684 & 16.5382 & 0.5129 & 8.6241 & 2621.5200 \\
+64 & 256 & 0.3932 & 1.1707 &  0.2981 & 1.8196 & 389.9800 \\
+64 & 1024 & 0.4139 & 1.8072 & 0.3559 & 1.3961 & 206.7200 \\
+64 & 4096 & 0.5717 & 16.9213 & 0.5458 & 9.8528 & 2653.5200 \\
+128 & 256 & 0.6964 & 2.0495 & 0.2965 & 0.7804 & 467.9200 \\
+128 & 1024 & 0.4726 & 1.9223  & 0.2800 & 1.4377 & 228.5200 \\
+128 & 4096 & 0.5614 & 19.2572 & 0.5270 & 16.1470 & 2729.0400 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\item
+Memory issues so cannot try it out.
+
+\end{enumerate}
+
 \end{document}
